@@ -63,6 +63,7 @@ result = getmode(wine_ff$price)
 print(result)
 ```
 
+
 ##price-grade
 ```{r price plot}
 wine.price=wine_ff %>% 
@@ -72,12 +73,16 @@ ggplot(data=wine.price,aes(x=grade,y=price,fill=grade))+
 summary(wine.price)
 ```
 
+It can be seen that the price of  wine in the group with a points greater than or equal to 90 is often higher than that in the group with a points less than 90.
+At the same time, there are many high priced wines in the "1" group, while the prices of wines in the "0" group are always less than 150 pounds. It can be seen that good wine is usually not cheap, and wine with low score is generally not too expensive.
+
 ```{r price logodd}
 wine.price$grade=as.numeric(wine.price$grade)
 model=glm(grade~price,data=wine.price,
           family = binomial(link="logit"))
 summary(model)
 ```
+the logodds of the "grade" increased by 0.058 ,if the price increases by one unit.Also,the point eatimate for the logodds is 0.058.
 
 
 ```{r}
@@ -93,6 +98,7 @@ price.logodds.lower=mod.price.coef.logodds[2,1]-1.96*mod.price.coef.logodds[2,2]
 price.logodds.upper=mod.price.coef.logodds[2,1]+1.96*mod.price.coef.logodds[2,2]
 table(price.logodds.lower,price.logodds.upper)
 ```
+The point eatimate for the logodds is 0.058,which has a corresponding 95% confidence interval of (0.05,0.065).Its visualization is as follows:
 
 ```{r logodds plot}
 plot_model(model,show.values=TRUE,transform=NULL,title="Log-Odds(price)",show.p=FALSE)
@@ -103,23 +109,29 @@ wine.price=wine.price %>%
   mutate(price.logodds=predict(model))
 ```
 
+```{r}
+model %>% 
+  coef() %>% 
+  exp()
+```
+
+
 ```{r price odd}
 price.odds.lower=exp(price.logodds.lower)
 price.odds.upper=exp(price.logodds.upper)
-
 plot_model(model,show.values = TRUE,axis.lim=c(1.05,1.07),title="Odds(price)",show.p = FALSE)
-
 wine.price=wine.price %>% 
   mutate(price.odds=exp(price.logodds))
 ```
+The odds is 1.06, which has a corresponding 95% confidence interval of (1.052,1.068) so for every 1 unit increase  in price, the odds of "grade" being "1" is increased by 1.06.
 
 ```{r price probabilities}
 wine.price=wine.price %>% 
   mutate(price.probs=fitted(model))
-
 ggplot(data=wine.price,aes(x=price,y=price.probs))+
   geom_smooth(method="glm",method.args=list(family="binomial"),se=FALSE)+
-  labs(x="price",y="probability of price")
+  labs(x="price",y="probability of being group 1")
+
 
 ```
 
@@ -137,17 +149,6 @@ country.tab=wine_ff %>%
   adorn_percentages() %>% 
   adorn_pct_formatting() %>% 
   adorn_ns()
-
-table(sort(wine.country$country))
-
-fre = as.data.frame(table(wine.country$country))
-colnames(fre) = c('country',"frequency")
-
-library('scales')
-fre_country = fre %>%
-  mutate(proportion = frequency/sum(fre$frequency))
-fre_country$proportion = percent(fre_country$proportion)
-glimpse(fre_country)
 
 library(gcookbook)
 ggplot(data=country.tab,aes(x=country,y=country.tab$`0`, fill = country))+
@@ -292,8 +293,51 @@ plogis(mod.logodd.country["(Intercept)", "Estimate"])
 ```{r}
 wine.model = wine_ff %>% 
   dplyr::select(grade,price,country,province,variety,winery)
-wine.model$grade = as.numeric(wine.model$grade) 
-model_f=glm(grade~.,data=wine.model,
+
+
+fre = as.data.frame(table(wine.model$country))
+colnames(fre) = c('country',"frequency")
+library('scales')
+fre_country = fre %>%
+  mutate(proportion = frequency/sum(fre$frequency))
+fre_country$proportion = percent(fre_country$proportion)
+view(fre_country)
+
+
+pro = as.data.frame(table(wine.model$province))
+colnames(pro) = c('province',"frequency")
+fre_province = pro %>%
+  mutate(proportion = frequency/sum(pro$frequency))
+fre_province$proportion = percent(fre_province$proportion)
+view(fre_province)
+
+
+var = as.data.frame(table(wine.model$variety))
+colnames(var) = c('variety',"frequency")
+fre_variety = var %>%
+  mutate(proportion = frequency/sum(var$frequency))
+fre_variety$proportion = percent(fre_variety$proportion)
+view(fre_variety)
+
+win = as.data.frame(table(wine.model$winery))
+colnames(win) = c('winery',"frequency")
+fre_winery = win %>%
+  mutate(proportion = frequency/sum(win$frequency))
+fre_winery$proportion = percent(fre_winery$proportion)
+view(fre_winery)
+
+wine.final = wine.model %>%
+  filter((country == "US" | country == "Italy" | country == "France") | (province == "California" | province == "Washington" | province == "Oregon" | province == "Tuscany") | (variety == "PinotNoir" | variety == "Chardonnay" | variety == "CabernetSauvigno" | variety == "RedBlend" | variety == "SauvignonBlanc"))
+
+view(wine.final)
+
+wine.final$grade = as.numeric(wine.final$grade)
+
+mode_f = glm(grade ~ price + country + province + variety,
+             data = wine.final,family = binomial(link="logit"))
+summary(mode_f)
+
+model_f=glm(grade~price + wine.model$countryUS + wine.model$countryFrance + wine.model$countryItaly + wine.model$provinceCalifornia +  wine.model$provinceWashington + wine.model$provinceOregon + wine.model$provinceTuscany + wine.model$varietyPinotNoir + wine.model$varietyChardonnay + wine.model$varietyCabernetSauvigno + wine.model$varietyRedBlend + wine.model$varietySauvignonBlanc,data=wine.model,
           family = binomial(link="logit"))
 summary(model_f)
 ```
